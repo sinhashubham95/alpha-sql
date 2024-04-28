@@ -123,5 +123,5 @@ func queryUsingRawConnection(ctx context.Context, c *Connection, query string, a
 	if err != nil {
 		return nil, err
 	}
-	return &rows{c: c, r: r}, nil
+	return &rows{c: c, r: r, s: s}, nil
 }

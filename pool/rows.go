@@ -15,12 +15,12 @@ type poolErrRows struct {
 	err error
 }
 
-func (p *poolRows) Next() bool {
-	return p.rows.Next()
+func (p *poolRows) Next(ctx context.Context) bool {
+	return p.rows.Next(ctx)
 }
 
-func (p *poolRows) NextResultSet() bool {
-	return p.rows.Next()
+func (p *poolRows) NextResultSet(ctx context.Context) bool {
+	return p.rows.Next(ctx)
 }
 
 func (p *poolRows) Error() error {
@@ -40,19 +40,11 @@ func (p *poolRows) Scan(values ...any) error {
 	return p.rows.Scan(values...)
 }
 
-func (p *poolRows) Values() ([]any, error) {
-	return p.rows.Values()
-}
-
-func (p *poolRows) RawValues() [][]byte {
-	return p.rows.RawValues()
-}
-
-func (p *poolErrRows) Next() bool {
+func (p *poolErrRows) Next(_ context.Context) bool {
 	return false
 }
 
-func (p *poolErrRows) NextResultSet() bool {
+func (p *poolErrRows) NextResultSet(_ context.Context) bool {
 	return false
 }
 
