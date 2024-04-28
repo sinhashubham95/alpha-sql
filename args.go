@@ -100,3 +100,14 @@ func getDriverNamedValuesFromArgs(c *Connection, args []any) ([]driver.NamedValu
 
 	return nvs, nil
 }
+
+func getDriverValueFromDriverNamedValue(nvs []driver.NamedValue) ([]driver.Value, error) {
+	vs := make([]driver.Value, len(nvs))
+	for i, v := range nvs {
+		if len(v.Name) > 0 {
+			return nil, ErrNamedArgNotSupported
+		}
+		vs[i] = v.Value
+	}
+	return vs, nil
+}

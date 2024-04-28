@@ -13,4 +13,5 @@ var (
 	ErrTXDone                       = errors.New("transaction has already been committed or rolled back")
 	ErrNamedArgNoLetterBegin        = errors.New("name does not begin with a letter")
 	ErrConvertingArgumentToNamedArg = errors.New("unable to convert argument to named arg")
+	ErrNamedArgNotSupported         = errors.New("driver does not support the use of Named Parameters")
 )

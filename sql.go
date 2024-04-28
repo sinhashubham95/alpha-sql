@@ -63,6 +63,22 @@ func (c *Connection) BeginTX(_ context.Context, _ *TXOptions) (TX, error) {
 	return nil, nil
 }
 
+func getDriverStatement(ctx context.Context, c *Connection, query string) (driver.Stmt, error) {
+	if cpc, ok := c.c.(driver.ConnPrepareContext); ok {
+		return cpc.PrepareContext(ctx, query)
+	}
+	s, err := c.c.Prepare(query)
+	if err == nil {
+		select {
+		default:
+		case <-ctx.Done():
+			_ = s.Close()
+			return nil, ctx.Err()
+		}
+	}
+	return s, err
+}
+
 func queryUsingQueryerContext(ctx context.Context, c *Connection, qc driver.QueryerContext,
 	query string, args ...any) (Rows, error) {
 	nvs, err := getDriverNamedValuesFromArgs(c, args)
@@ -76,6 +92,36 @@ func queryUsingQueryerContext(ctx context.Context, c *Connection, qc driver.Quer
 	return &rows{c: c, r: r}, nil
 }
 
+func queryUsingDriverStatement(ctx context.Context, c *Connection, s driver.Stmt, args []any) (driver.Rows, error) {
+	nvs, err := getDriverNamedValuesFromArgs(c, args)
+	if err != nil {
+		_ = s.Close()
+		return nil, err
+	}
+	if sc, is := s.(driver.StmtQueryContext); is {
+		return sc.QueryContext(ctx, nvs)
+	}
+	vs, err := getDriverValueFromDriverNamedValue(nvs)
+	if err != nil {
+		_ = s.Close()
+		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+	return s.Query(vs)
+}
+
 func queryUsingRawConnection(ctx context.Context, c *Connection, query string, args ...any) (Rows, error) {
-	return nil, nil
+	s, err := getDriverStatement(ctx, c, query)
+	if err != nil {
+		return nil, err
+	}
+	r, err := queryUsingDriverStatement(ctx, c, s, args)
+	if err != nil {
+		return nil, err
+	}
+	return &rows{c: c, r: r}, nil
 }
