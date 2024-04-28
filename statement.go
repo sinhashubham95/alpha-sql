@@ -1,6 +1,9 @@
 package alphasql
 
-import "context"
+import (
+	"context"
+	"database/sql/driver"
+)
 
 // Statement is a prepared statement.
 // A Statement is safe for concurrent use by multiple goroutines.
@@ -14,4 +17,8 @@ type Statement interface {
 	Exec(ctx context.Context, args ...any) (Result, error)
 	Query(ctx context.Context, args ...any) (Rows, error)
 	QueryRow(ctx context.Context, args ...any) (Row, error)
+}
+
+type statement struct {
+	s driver.Stmt
 }

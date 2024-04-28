@@ -1,17 +1,27 @@
 package alphasql
 
-import "context"
+import (
+	"context"
+	"database/sql/driver"
+)
 
 // Ping verifies a Connection to the database is still alive,
 // establishing a Connection if necessary.
-func (c *Connection) Ping(_ context.Context) error {
+func (c *Connection) Ping(ctx context.Context) error {
+	if p, ok := c.c.(driver.Pinger); ok {
+		return p.Ping(ctx)
+	}
 	return nil
 }
 
 // Query executes a query that returns rows, typically a SELECT.
 // The args are for any placeholder parameters in the query.
-func (c *Connection) Query(_ context.Context, _ string, _ ...any) (Rows, error) {
-	return nil, nil
+func (c *Connection) Query(ctx context.Context, query string, args ...any) (Rows, error) {
+	qc, ok := c.c.(driver.QueryerContext)
+	if ok {
+		return queryUsingQueryerContext(ctx, c, qc, query, args...)
+	}
+	return queryUsingRawConnection(ctx, c, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -50,5 +60,22 @@ func (c *Connection) Prepare(_ context.Context, _ string) (Statement, error) {
 // If a non-default isolation level is used that the driver doesn't support,
 // an error will be returned.
 func (c *Connection) BeginTX(_ context.Context, _ *TXOptions) (TX, error) {
+	return nil, nil
+}
+
+func queryUsingQueryerContext(ctx context.Context, c *Connection, qc driver.QueryerContext,
+	query string, args ...any) (Rows, error) {
+	nvs, err := getDriverNamedValuesFromArgs(c, args)
+	if err != nil {
+		return nil, err
+	}
+	r, err := qc.QueryContext(ctx, query, nvs)
+	if err != nil {
+		return nil, err
+	}
+	return &rows{c: c, r: r}, nil
+}
+
+func queryUsingRawConnection(ctx context.Context, c *Connection, query string, args ...any) (Rows, error) {
 	return nil, nil
 }
