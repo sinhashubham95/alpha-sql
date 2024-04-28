@@ -3,6 +3,7 @@ package alphasql
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 )
 
 // Ping verifies a Connection to the database is still alive,
@@ -24,7 +25,7 @@ func (c *Connection) Query(ctx context.Context, query string, args ...any) (Rows
 		}
 		return nil, err
 	}
-	return &rows{c: c, s: s, r: r}, nil
+	return &rows{s: s, r: r}, nil
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -35,13 +36,20 @@ func (c *Connection) Query(ctx context.Context, query string, args ...any) (Rows
 // the rest.
 func (c *Connection) QueryRow(ctx context.Context, query string, args ...any) Row {
 	r, err := c.Query(ctx, query, args)
-	return &row{c: c, r: r, err: err}
+	return &row{r: r, err: err}
 }
 
 // Exec executes a query without returning any rows.
 // The args are for any placeholder parameters in the query.
-func (c *Connection) Exec(_ context.Context, _ string, _ ...any) (Result, error) {
-	return nil, nil
+func (c *Connection) Exec(ctx context.Context, query string, args ...any) (Result, error) {
+	r, s, err := c.exec(ctx, query, args)
+	if s != nil {
+		_ = s.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &result{r: r}, nil
 }
 
 // Prepare creates a prepared statement for later queries or executions.
@@ -68,12 +76,33 @@ func (c *Connection) BeginTX(_ context.Context, _ *TXOptions) (TX, error) {
 }
 
 func (c *Connection) query(ctx context.Context, query string, args []any) (driver.Rows, driver.Stmt, error) {
+	nvs, err := getDriverNamedValuesFromArgs(c, args)
+	if err != nil {
+		return nil, nil, err
+	}
 	qc, ok := c.c.(driver.QueryerContext)
 	if ok {
-		r, err := queryUsingQueryerContext(ctx, c, qc, query, args)
-		return r, nil, err
+		r, err := queryUsingQueryerContext(ctx, qc, query, nvs)
+		if !errors.Is(err, driver.ErrSkip) {
+			return r, nil, err
+		}
 	}
-	return queryUsingRawConnection(ctx, c, query, args)
+	return queryUsingRawConnection(ctx, c, query, nvs)
+}
+
+func (c *Connection) exec(ctx context.Context, query string, args []any) (driver.Result, driver.Stmt, error) {
+	nvs, err := getDriverNamedValuesFromArgs(c, args)
+	if err != nil {
+		return nil, nil, err
+	}
+	ec, ok := c.c.(driver.ExecerContext)
+	if ok {
+		r, err := execUsingExecerContext(ctx, ec, query, nvs)
+		if !errors.Is(err, driver.ErrSkip) {
+			return r, nil, err
+		}
+	}
+	return execUsingRawConnection(ctx, c, query, nvs)
 }
 
 func getDriverStatement(ctx context.Context, c *Connection, query string) (driver.Stmt, error) {
@@ -92,21 +121,12 @@ func getDriverStatement(ctx context.Context, c *Connection, query string) (drive
 	return s, err
 }
 
-func queryUsingQueryerContext(ctx context.Context, c *Connection, qc driver.QueryerContext,
-	query string, args []any) (driver.Rows, error) {
-	nvs, err := getDriverNamedValuesFromArgs(c, args)
-	if err != nil {
-		return nil, err
-	}
+func queryUsingQueryerContext(ctx context.Context, qc driver.QueryerContext,
+	query string, nvs []driver.NamedValue) (driver.Rows, error) {
 	return qc.QueryContext(ctx, query, nvs)
 }
 
-func queryUsingDriverStatement(ctx context.Context, c *Connection, s driver.Stmt, args []any) (driver.Rows, error) {
-	nvs, err := getDriverNamedValuesFromArgs(c, args)
-	if err != nil {
-		_ = s.Close()
-		return nil, err
-	}
+func queryUsingDriverStatement(ctx context.Context, s driver.Stmt, nvs []driver.NamedValue) (driver.Rows, error) {
 	if sc, is := s.(driver.StmtQueryContext); is {
 		return sc.QueryContext(ctx, nvs)
 	}
@@ -123,11 +143,44 @@ func queryUsingDriverStatement(ctx context.Context, c *Connection, s driver.Stmt
 	return s.Query(vs)
 }
 
-func queryUsingRawConnection(ctx context.Context, c *Connection, query string, args []any) (driver.Rows, driver.Stmt, error) {
+func queryUsingRawConnection(ctx context.Context, c *Connection, query string,
+	nvs []driver.NamedValue) (driver.Rows, driver.Stmt, error) {
 	s, err := getDriverStatement(ctx, c, query)
 	if err != nil {
 		return nil, nil, err
 	}
-	r, err := queryUsingDriverStatement(ctx, c, s, args)
+	r, err := queryUsingDriverStatement(ctx, s, nvs)
+	return r, s, err
+}
+
+func execUsingExecerContext(ctx context.Context, ec driver.ExecerContext, query string,
+	nvs []driver.NamedValue) (driver.Result, error) {
+	return ec.ExecContext(ctx, query, nvs)
+}
+
+func execUsingDriverStatement(ctx context.Context, s driver.Stmt, nvs []driver.NamedValue) (driver.Result, error) {
+	if sc, is := s.(driver.StmtExecContext); is {
+		return sc.ExecContext(ctx, nvs)
+	}
+	vs, err := getDriverValueFromDriverNamedValue(nvs)
+	if err != nil {
+		_ = s.Close()
+		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+	return s.Exec(vs)
+}
+
+func execUsingRawConnection(ctx context.Context, c *Connection, query string,
+	nvs []driver.NamedValue) (driver.Result, driver.Stmt, error) {
+	s, err := getDriverStatement(ctx, c, query)
+	if err != nil {
+		return nil, nil, err
+	}
+	r, err := execUsingDriverStatement(ctx, s, nvs)
 	return r, s, err
 }

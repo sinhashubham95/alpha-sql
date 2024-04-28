@@ -51,7 +51,7 @@ func (p *Pool) QueryRow(ctx context.Context, query string, args ...any) alphasql
 func (p *Pool) Exec(ctx context.Context, query string, args ...any) (alphasql.Result, error) {
 	c, err := p.Acquire(ctx)
 	if err != nil {
-		return p.getPoolErrResult(err), err
+		return nil, err
 	}
 	defer p.Release(ctx, c)
 	return c.Exec(ctx, query, args...)
@@ -108,10 +108,6 @@ func (p *Pool) getPoolRow(c *Connection, r alphasql.Row) *poolRow {
 
 func (p *Pool) getPoolErrRow(err error) *poolErrRow {
 	return &poolErrRow{err: err}
-}
-
-func (p *Pool) getPoolErrResult(err error) *poolErrResult {
-	return &poolErrResult{err: err}
 }
 
 func (p *Pool) getPoolTX(c *Connection, t alphasql.TX) *poolTX {

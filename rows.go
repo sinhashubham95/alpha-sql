@@ -101,7 +101,6 @@ type Rows interface {
 }
 
 type rows struct {
-	c       *Connection
 	s       driver.Stmt
 	r       driver.Rows
 	end     bool

@@ -11,7 +11,6 @@ type Row interface {
 }
 
 type row struct {
-	c   *Connection
 	s   driver.Stmt
 	r   Rows
 	err error
