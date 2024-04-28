@@ -33,8 +33,9 @@ func (c *Connection) Query(ctx context.Context, query string, args ...any) (Rows
 // If the query selects no rows, the [*Row.Scan] will return [ErrNoRows].
 // Otherwise, [*Row.Scan] scans the first selected row and discards
 // the rest.
-func (c *Connection) QueryRow(_ context.Context, _ string, _ ...any) Row {
-	return nil
+func (c *Connection) QueryRow(ctx context.Context, query string, args ...any) Row {
+	r, err := c.Query(ctx, query, args)
+	return &row{c: c, r: r, err: err}
 }
 
 // Exec executes a query without returning any rows.
