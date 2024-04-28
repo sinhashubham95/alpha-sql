@@ -17,11 +17,14 @@ func (c *Connection) Ping(ctx context.Context) error {
 // Query executes a query that returns rows, typically a SELECT.
 // The args are for any placeholder parameters in the query.
 func (c *Connection) Query(ctx context.Context, query string, args ...any) (Rows, error) {
-	qc, ok := c.c.(driver.QueryerContext)
-	if ok {
-		return queryUsingQueryerContext(ctx, c, qc, query, args...)
+	r, s, err := c.query(ctx, query, args)
+	if err != nil {
+		if s != nil {
+			_ = s.Close()
+		}
+		return nil, err
 	}
-	return queryUsingRawConnection(ctx, c, query, args...)
+	return &rows{c: c, s: s, r: r}, nil
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -63,6 +66,15 @@ func (c *Connection) BeginTX(_ context.Context, _ *TXOptions) (TX, error) {
 	return nil, nil
 }
 
+func (c *Connection) query(ctx context.Context, query string, args []any) (driver.Rows, driver.Stmt, error) {
+	qc, ok := c.c.(driver.QueryerContext)
+	if ok {
+		r, err := queryUsingQueryerContext(ctx, c, qc, query, args)
+		return r, nil, err
+	}
+	return queryUsingRawConnection(ctx, c, query, args)
+}
+
 func getDriverStatement(ctx context.Context, c *Connection, query string) (driver.Stmt, error) {
 	if cpc, ok := c.c.(driver.ConnPrepareContext); ok {
 		return cpc.PrepareContext(ctx, query)
@@ -80,16 +92,12 @@ func getDriverStatement(ctx context.Context, c *Connection, query string) (drive
 }
 
 func queryUsingQueryerContext(ctx context.Context, c *Connection, qc driver.QueryerContext,
-	query string, args ...any) (Rows, error) {
+	query string, args []any) (driver.Rows, error) {
 	nvs, err := getDriverNamedValuesFromArgs(c, args)
 	if err != nil {
 		return nil, err
 	}
-	r, err := qc.QueryContext(ctx, query, nvs)
-	if err != nil {
-		return nil, err
-	}
-	return &rows{c: c, r: r}, nil
+	return qc.QueryContext(ctx, query, nvs)
 }
 
 func queryUsingDriverStatement(ctx context.Context, c *Connection, s driver.Stmt, args []any) (driver.Rows, error) {
@@ -114,14 +122,11 @@ func queryUsingDriverStatement(ctx context.Context, c *Connection, s driver.Stmt
 	return s.Query(vs)
 }
 
-func queryUsingRawConnection(ctx context.Context, c *Connection, query string, args ...any) (Rows, error) {
+func queryUsingRawConnection(ctx context.Context, c *Connection, query string, args []any) (driver.Rows, driver.Stmt, error) {
 	s, err := getDriverStatement(ctx, c, query)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	r, err := queryUsingDriverStatement(ctx, c, s, args)
-	if err != nil {
-		return nil, err
-	}
-	return &rows{c: c, r: r, s: s}, nil
+	return r, s, err
 }
