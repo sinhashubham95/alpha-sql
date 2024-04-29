@@ -4,35 +4,36 @@ import "context"
 
 // Scanner is used to scan the data to the respective types.
 type Scanner interface {
-	Scan(values ...interface{}) error
-	ScanStructure(value interface{}) error
+	Scan(ctx context.Context, values ...interface{}) error
+	ScanStructure(ctx context.Context, value interface{}) error
 }
 
 // Entity is used to provide the set of functionalities common around database operations on a table.
 type Entity interface {
 	GetIDQuery() string
-	GetIDValues() []interface{}
-	GetAllQuery(ctx context.Context) string
+	GetIDArgs() []interface{}
+	GetAllQuery() string
+	GetAllQueryArgs() []interface{}
 	GetNext() Entity
 	BindRow(row Scanner) error
 	GetFreshSaveQuery() string
-	GetFreshFieldValues(source string) []interface{}
+	GetFreshSaveArgs() []interface{}
 	GetSaveQuery() string
-	GetFieldValues(source string) []interface{}
+	GetSaveArgs() []interface{}
 	GetDeleteQuery() string
-	GetDeleteValues() []interface{}
+	GetDeleteArgs() []interface{}
 }
 
 // RawEntity is used to provide the set of raw functionalities around the database operations on a table.
 type RawEntity interface {
-	GetQuery(ctx context.Context, code int) string
-	GetQueryValues(code int) []interface{}
-	GetMultiQuery(ctx context.Context, code int) string
-	GetMultiQueryValues(code int) []interface{}
-	GetNextRaw() RawEntity
-	BindRawRow(code int, row Scanner) error
+	GetQueryRow(code int) string
+	GetQueryRowArgs(code int) []interface{}
+	GetQuery(code int) string
+	GetQueryArgs(code int) []interface{}
+	GetNext() RawEntity
+	BindRow(code int, row Scanner) error
 	GetExec(code int) string
-	GetExecValues(code int, source string) []interface{}
+	GetExecArgs(code int) []interface{}
 }
 
 // RawExec is the structure for the entity and the code

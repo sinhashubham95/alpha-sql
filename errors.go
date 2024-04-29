@@ -14,6 +14,7 @@ var (
 	ErrPoolClosed                     = errors.New("closed pool")
 	ErrRowsClosed                     = errors.New("rows are closed")
 	ErrNoRows                         = errors.New("no rows in result set")
+	ErrNoRowsAffected                 = errors.New("no rows affected")
 	ErrRowsScanWithoutNext            = errors.New("scan called without calling next")
 	ErrRowsUnexpectedScanValues       = errors.New("unexpected scan values")
 	ErrRowsUnexpectedScan             = errors.New("unexpected scan")
@@ -28,4 +29,5 @@ var (
 	ErrNilPointer                     = errors.New("destination pointer is nil")
 	ErrNotAPointer                    = errors.New("destination is not a pointer")
 	ErrBadConnection                  = errors.New("bad connection")
+	ErrScanToStructureNotEnabled      = errors.New("scanning to a structure not enabled")
 )
