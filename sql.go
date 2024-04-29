@@ -25,7 +25,9 @@ func (c *Connection) Query(ctx context.Context, query string, args ...any) (Rows
 		}
 		return nil, err
 	}
-	return &rows{s: s, r: r}, nil
+	rr := &rows{s: s, r: r}
+	go rr.contextCloseHandling(ctx)
+	return rr, nil
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -71,8 +73,18 @@ func (c *Connection) Prepare(_ context.Context, _ string) (Statement, error) {
 // The provided [TXOptions] is optional and may be nil if defaults should be used.
 // If a non-default isolation level is used that the driver doesn't support,
 // an error will be returned.
-func (c *Connection) BeginTX(_ context.Context, _ *TXOptions) (TX, error) {
-	return nil, nil
+func (c *Connection) BeginTX(ctx context.Context, options *TXOptions) (TX, error) {
+	options, err := validateAndDefaultTXOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	t, err := c.beginTX(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	tt := &tx{t: t}
+	go tt.contextCloseHandling(ctx)
+	return tt, nil
 }
 
 func (c *Connection) query(ctx context.Context, query string, args []any) (driver.Rows, driver.Stmt, error) {
@@ -103,6 +115,17 @@ func (c *Connection) exec(ctx context.Context, query string, args []any) (driver
 		}
 	}
 	return execUsingRawConnection(ctx, c, query, nvs)
+}
+
+func (c *Connection) beginTX(ctx context.Context, options *TXOptions) (driver.Tx, error) {
+	cb, ok := c.c.(driver.ConnBeginTx)
+	if ok {
+		tx, err := beginTXUsingConnectionBeginContext(ctx, cb, options)
+		if !errors.Is(err, driver.ErrSkip) {
+			return tx, err
+		}
+	}
+	return beginTXUsingRawConnection(c)
 }
 
 func getDriverStatement(ctx context.Context, c *Connection, query string) (driver.Stmt, error) {
@@ -183,4 +206,12 @@ func execUsingRawConnection(ctx context.Context, c *Connection, query string,
 	}
 	r, err := execUsingDriverStatement(ctx, s, nvs)
 	return r, s, err
+}
+
+func beginTXUsingConnectionBeginContext(ctx context.Context, cb driver.ConnBeginTx, options *TXOptions) (driver.Tx, error) {
+	return cb.BeginTx(ctx, options.driverOptions())
+}
+
+func beginTXUsingRawConnection(c *Connection) (driver.Tx, error) {
+	return c.c.Begin()
 }

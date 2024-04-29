@@ -1,6 +1,9 @@
 package alphasql
 
-import "context"
+import (
+	"context"
+	"database/sql/driver"
+)
 
 // TXIsolationLevel is the transaction isolation level used in [TXOptions].
 type TXIsolationLevel int
@@ -29,24 +32,10 @@ const (
 	TXAccessModeReadOnly  TXAccessMode = "read only"
 )
 
-// TXDeferrableMode is the transaction deferrable mode (deferrable or not deferrable)
-type TXDeferrableMode string
-
-// Transaction deferrable modes
-const (
-	TXDeferrableModeDeferrable    TXDeferrableMode = "deferrable"
-	TXDeferrableModeNotDeferrable TXDeferrableMode = "not deferrable"
-)
-
 // TXOptions holds the transaction options to be used in [Connection.BeginTX].
 type TXOptions struct {
 	IsolationLevel TXIsolationLevel
 	AccessMode     TXAccessMode
-	DeferrableMode TXDeferrableMode
-
-	// BeginQuery is the SQL query that will be executed to begin the transaction. This allows using non-standard syntax
-	// such as BEGIN PRIORITY HIGH with CockroachDB. If set this will override the other settings.
-	BeginQuery string
 }
 
 // TX is an in-progress database transaction.
@@ -67,4 +56,86 @@ type TX interface {
 	Exec(ctx context.Context, query string, args ...any) (Result, error)
 	Prepare(ctx context.Context, query string) (Statement, error)
 	Statement(ctx context.Context, s Statement) (Statement, error)
+}
+
+type tx struct {
+	c      *Connection
+	t      driver.Tx
+	closed bool
+	cancel context.CancelFunc
+}
+
+func (t *tx) Commit(_ context.Context) error {
+	if t.closed {
+		return ErrTXClosed
+	}
+	t.closed = true
+	defer t.cancel()
+	return t.t.Commit()
+}
+
+func (t *tx) Rollback(_ context.Context) error {
+	if t.closed {
+		return ErrTXClosed
+	}
+	t.closed = true
+	defer t.cancel()
+	return t.t.Rollback()
+}
+
+func (t *tx) Query(ctx context.Context, query string, args ...any) (Rows, error) {
+	return t.c.Query(ctx, query, args...)
+}
+
+func (t *tx) QueryRow(ctx context.Context, query string, args ...any) Row {
+	return t.c.QueryRow(ctx, query, args...)
+}
+
+func (t *tx) Exec(ctx context.Context, query string, args ...any) (Result, error) {
+	return t.c.Exec(ctx, query, args...)
+}
+
+func (t *tx) Prepare(_ context.Context, _ string) (Statement, error) {
+	return nil, nil
+}
+
+func (t *tx) Statement(_ context.Context, _ Statement) (Statement, error) {
+	return nil, nil
+}
+
+func (t *tx) awaitDone(ctx context.Context) {
+	<-ctx.Done()
+	_ = t.Rollback(ctx)
+}
+
+func (t *tx) contextCloseHandling(ctx context.Context) {
+	if ctx.Done() == nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	t.cancel = cancel
+	go t.awaitDone(ctx)
+}
+
+func validateAndDefaultTXOptions(options *TXOptions) (*TXOptions, error) {
+	if options == nil {
+		options = &TXOptions{
+			IsolationLevel: TXIsolationLevelDefault,
+			AccessMode:     TXAccessModeReadWrite,
+		}
+	}
+	if options.IsolationLevel < TXIsolationLevelDefault || options.IsolationLevel > TXIsolationLevelLinearizable {
+		return nil, ErrTXOptionsInvalidIsolationLevel
+	}
+	if options.AccessMode != TXAccessModeReadWrite && options.AccessMode != TXAccessModeReadOnly {
+		return nil, ErrTXOptionsInvalidAccessMode
+	}
+	return options, nil
+}
+
+func (o *TXOptions) driverOptions() driver.TxOptions {
+	return driver.TxOptions{
+		Isolation: driver.IsolationLevel(o.IsolationLevel),
+		ReadOnly:  o.AccessMode == TXAccessModeReadOnly,
+	}
 }
