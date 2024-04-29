@@ -44,6 +44,9 @@ func (p *Pool) QueryRow(ctx context.Context, query string, args ...any) alphasql
 		return p.getPoolErrRow(err)
 	}
 	r := c.QueryRow(ctx, query, args...)
+	if r.Error() != nil {
+		p.closeOrRelease(ctx, c, r.Error())
+	}
 	return p.getPoolRow(c, r)
 }
 

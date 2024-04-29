@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Acquire is used to return a (*Connection) from the pool.
+// Acquire is used to get a (*Connection) from the pool.
 func (p *Pool) Acquire(ctx context.Context) (*Connection, error) {
 	for {
 		c, err := p.acquire(ctx)
@@ -29,6 +29,7 @@ func (p *Pool) Acquire(ctx context.Context) (*Connection, error) {
 	}
 }
 
+// Release is used to return a (*Connection) to the pool.
 func (p *Pool) Release(ctx context.Context, c *Connection) {
 	if c.status != connectionStatusAcquired {
 		return

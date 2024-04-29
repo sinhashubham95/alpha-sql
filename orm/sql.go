@@ -6,6 +6,10 @@ import (
 )
 
 func (o *orm) GetByID(ctx context.Context, entity entity.Entity) error {
+	r := o.p.QueryRow(ctx, entity.GetIDQuery(), entity.GetIDValues()...)
+	if r.Error() != nil {
+
+	}
 	//TODO implement me
 	panic("implement me")
 }
