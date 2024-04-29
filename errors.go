@@ -24,4 +24,5 @@ var (
 	ErrNamedArgNotSupported           = errors.New("driver does not support the use of Named Parameters")
 	ErrNilPointer                     = errors.New("destination pointer is nil")
 	ErrNotAPointer                    = errors.New("destination is not a pointer")
+	ErrBadConnection                  = errors.New("bad connection")
 )

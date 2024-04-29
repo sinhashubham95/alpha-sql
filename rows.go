@@ -101,19 +101,17 @@ type Rows interface {
 }
 
 type rows struct {
-	s       driver.Stmt
-	r       driver.Rows
-	end     bool
-	err     error
-	cancel  context.CancelFunc
-	ctxDone error
-	closed  bool
+	s      driver.Stmt
+	r      driver.Rows
+	end    bool
+	err    error
+	closed bool
 
 	current []driver.Value
 }
 
 func (r *rows) Next(ctx context.Context) bool {
-	if r.ctxDone != nil {
+	if r.closed {
 		return false
 	}
 	doClose, ok := r.next()
@@ -145,15 +143,6 @@ func (r *rows) NextResultSet(ctx context.Context) bool {
 }
 
 func (r *rows) Error() error {
-	// Return any context error that might've happened during row iteration,
-	// but only if we haven't reported the final Next() = false after rows
-	// are done, in which case the user might've canceled their own context
-	// before calling Rows.Error.
-	if !r.end {
-		if r.ctxDone != nil {
-			return r.ctxDone
-		}
-	}
 	if r.err != nil && r.err != io.EOF {
 		return r.err
 	}
@@ -195,34 +184,10 @@ func (r *rows) close(err error) error {
 		r.err = err
 	}
 	err = r.r.Close()
-	if r.cancel != nil {
-		r.cancel()
-	}
 	if r.s != nil {
 		_ = r.s.Close()
 	}
 	return err
-}
-
-func (r *rows) awaitDone(ctx, closeCtx context.Context) {
-	select {
-	case <-ctx.Done():
-		err := ctx.Err()
-		r.ctxDone = err
-	case <-closeCtx.Done():
-		// rs.cancel was called via Close(); don't store this into contextDone
-		// to ensure Err() is unaffected.
-	}
-	_ = r.close(ctx.Err())
-}
-
-func (r *rows) contextCloseHandling(ctx context.Context) {
-	if ctx.Done() == nil {
-		return
-	}
-	closeCtx, cancel := context.WithCancel(ctx)
-	r.cancel = cancel
-	go r.awaitDone(ctx, closeCtx)
 }
 
 func (r *rows) next() (bool, bool) {

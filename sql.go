@@ -10,7 +10,11 @@ import (
 // establishing a Connection if necessary.
 func (c *Connection) Ping(ctx context.Context) error {
 	if p, ok := c.c.(driver.Pinger); ok {
-		return p.Ping(ctx)
+		err := p.Ping(ctx)
+		if errors.Is(err, driver.ErrBadConn) {
+			err = ErrBadConnection
+		}
+		return err
 	}
 	return nil
 }
@@ -19,6 +23,9 @@ func (c *Connection) Ping(ctx context.Context) error {
 // The args are for any placeholder parameters in the query.
 func (c *Connection) Query(ctx context.Context, query string, args ...any) (Rows, error) {
 	r, s, err := c.query(ctx, query, args)
+	if errors.Is(err, driver.ErrBadConn) {
+		err = ErrBadConnection
+	}
 	if err != nil {
 		if s != nil {
 			_ = s.Close()
@@ -26,7 +33,6 @@ func (c *Connection) Query(ctx context.Context, query string, args ...any) (Rows
 		return nil, err
 	}
 	rr := &rows{s: s, r: r}
-	go rr.contextCloseHandling(ctx)
 	return rr, nil
 }
 
@@ -38,6 +44,9 @@ func (c *Connection) Query(ctx context.Context, query string, args ...any) (Rows
 // the rest.
 func (c *Connection) QueryRow(ctx context.Context, query string, args ...any) Row {
 	r, err := c.Query(ctx, query, args)
+	if errors.Is(err, driver.ErrBadConn) {
+		err = ErrBadConnection
+	}
 	return &row{r: r, err: err}
 }
 
@@ -47,6 +56,9 @@ func (c *Connection) Exec(ctx context.Context, query string, args ...any) (Resul
 	r, s, err := c.exec(ctx, query, args)
 	if s != nil {
 		_ = s.Close()
+	}
+	if errors.Is(err, driver.ErrBadConn) {
+		err = ErrBadConnection
 	}
 	if err != nil {
 		return nil, err
@@ -79,13 +91,15 @@ func (c *Connection) BeginTX(ctx context.Context, options *TXOptions) (TX, error
 		return nil, err
 	}
 	t, err := c.beginTX(ctx, options)
+	if errors.Is(err, driver.ErrBadConn) {
+		err = ErrBadConnection
+	}
 	if err != nil {
 		return nil, err
 	}
 	_, hasSessionReset := c.c.(driver.SessionResetter)
 	_, hasConnectionValidation := c.c.(driver.Validator)
 	tt := &tx{c: c, t: t, keepConnectionOnRollback: hasSessionReset && hasConnectionValidation}
-	go tt.contextCloseHandling(ctx)
 	return tt, nil
 }
 

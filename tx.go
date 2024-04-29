@@ -43,7 +43,7 @@ type TXOptions struct {
 // A transaction must end with a call to [TX.Commit] or [TX.Rollback].
 //
 // After a call to [TX.Commit] or [TX.Rollback], all operations on the
-// transaction fail with [ErrTXDone].
+// transaction fail with [ErrTXClosed].
 //
 // The statements prepared for a transaction by calling
 // the transaction's [TX.Prepare] are closed
@@ -63,7 +63,6 @@ type tx struct {
 	c                        *Connection
 	t                        driver.Tx
 	closed                   bool
-	cancel                   context.CancelFunc
 	keepConnectionOnRollback bool
 }
 
@@ -72,7 +71,6 @@ func (t *tx) Commit(_ context.Context) error {
 		return ErrTXClosed
 	}
 	t.closed = true
-	defer t.cancel()
 	return t.t.Commit()
 }
 
@@ -81,7 +79,6 @@ func (t *tx) Rollback(_ context.Context) error {
 		return ErrTXClosed
 	}
 	t.closed = true
-	defer t.cancel()
 	return t.t.Rollback()
 }
 
@@ -107,20 +104,6 @@ func (t *tx) Statement(_ context.Context, _ Statement) (Statement, error) {
 
 func (t *tx) KeepConnectionOnRollback() bool {
 	return t.keepConnectionOnRollback
-}
-
-func (t *tx) awaitDone(ctx context.Context) {
-	<-ctx.Done()
-	_ = t.Rollback(ctx)
-}
-
-func (t *tx) contextCloseHandling(ctx context.Context) {
-	if ctx.Done() == nil {
-		return
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	t.cancel = cancel
-	go t.awaitDone(ctx)
 }
 
 func validateAndDefaultTXOptions(options *TXOptions) (*TXOptions, error) {
