@@ -4,10 +4,13 @@ import "errors"
 
 // errors
 var (
+	ErrDBClosed                       = errors.New("db is closed")
+	ErrMissingPoolConfig              = errors.New("no pool config provided")
 	ErrMissingConnectionConfig        = errors.New("no connection config provided")
 	ErrMissingDriverName              = errors.New("driver name is a mandatory config")
 	ErrMissingURL                     = errors.New("url is a mandatory config")
 	ErrPoolSpaceNotAvailable          = errors.New("no space available to create new connections")
+	ErrORMClosed                      = errors.New("orm is closed")
 	ErrPoolClosed                     = errors.New("closed pool")
 	ErrRowsClosed                     = errors.New("rows are closed")
 	ErrNoRows                         = errors.New("no rows in result set")

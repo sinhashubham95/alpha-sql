@@ -34,6 +34,9 @@ func (c *ConnectionConfig) Copy() *ConnectionConfig {
 
 // Connect is used to create a new connection.
 func (db *DB) Connect(ctx context.Context) (*Connection, error) {
+	if db.closed.Load() {
+		return nil, ErrDBClosed
+	}
 	c, err := db.c.Connect(ctx)
 	if err != nil {
 		return nil, err
