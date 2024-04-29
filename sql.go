@@ -82,7 +82,9 @@ func (c *Connection) BeginTX(ctx context.Context, options *TXOptions) (TX, error
 	if err != nil {
 		return nil, err
 	}
-	tt := &tx{t: t}
+	_, hasSessionReset := c.c.(driver.SessionResetter)
+	_, hasConnectionValidation := c.c.(driver.Validator)
+	tt := &tx{c: c, t: t, keepConnectionOnRollback: hasSessionReset && hasConnectionValidation}
 	go tt.contextCloseHandling(ctx)
 	return tt, nil
 }

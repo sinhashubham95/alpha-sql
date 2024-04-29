@@ -23,7 +23,11 @@ func (p *poolTX) Commit(ctx context.Context) error {
 func (p *poolTX) Rollback(ctx context.Context) error {
 	err := p.t.Rollback(ctx)
 	if p.c != nil {
-		p.p.Release(ctx, p.c)
+		if p.KeepConnectionOnRollback() {
+			p.p.Release(ctx, p.c)
+		} else {
+			go p.p.p.destroyAcquiredConnection(ctx, p.c)
+		}
 		p.c = nil
 	}
 	return err
@@ -47,4 +51,8 @@ func (p *poolTX) Prepare(ctx context.Context, query string) (alphasql.Statement,
 
 func (p *poolTX) Statement(ctx context.Context, s alphasql.Statement) (alphasql.Statement, error) {
 	return p.t.Statement(ctx, s)
+}
+
+func (p *poolTX) KeepConnectionOnRollback() bool {
+	return p.t.KeepConnectionOnRollback()
 }

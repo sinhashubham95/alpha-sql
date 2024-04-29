@@ -56,13 +56,15 @@ type TX interface {
 	Exec(ctx context.Context, query string, args ...any) (Result, error)
 	Prepare(ctx context.Context, query string) (Statement, error)
 	Statement(ctx context.Context, s Statement) (Statement, error)
+	KeepConnectionOnRollback() bool
 }
 
 type tx struct {
-	c      *Connection
-	t      driver.Tx
-	closed bool
-	cancel context.CancelFunc
+	c                        *Connection
+	t                        driver.Tx
+	closed                   bool
+	cancel                   context.CancelFunc
+	keepConnectionOnRollback bool
 }
 
 func (t *tx) Commit(_ context.Context) error {
@@ -101,6 +103,10 @@ func (t *tx) Prepare(_ context.Context, _ string) (Statement, error) {
 
 func (t *tx) Statement(_ context.Context, _ Statement) (Statement, error) {
 	return nil, nil
+}
+
+func (t *tx) KeepConnectionOnRollback() bool {
+	return t.keepConnectionOnRollback
 }
 
 func (t *tx) awaitDone(ctx context.Context) {
