@@ -116,6 +116,7 @@ func New(ctx context.Context, cfg *Configuration) (ORM, error) {
 	}, nil
 }
 
+// BeginTX is used to start a transaction with ORM functionalities.
 func (o *orm) BeginTX(ctx context.Context, options *alphasql.TXOptions) (TransactionalORM, error) {
 	tx, err := o.p.BeginTX(ctx, options)
 	if err != nil {
