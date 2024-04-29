@@ -14,7 +14,7 @@ type poolTX struct {
 func (p *poolTX) Commit(ctx context.Context) error {
 	err := p.t.Commit(ctx)
 	if p.c != nil {
-		p.p.Release(ctx, p.c)
+		p.p.closeOrRelease(ctx, p.c, err)
 		p.c = nil
 	}
 	return err
@@ -24,7 +24,7 @@ func (p *poolTX) Rollback(ctx context.Context) error {
 	err := p.t.Rollback(ctx)
 	if p.c != nil {
 		if p.KeepConnectionOnRollback() {
-			p.p.Release(ctx, p.c)
+			p.p.closeOrRelease(ctx, p.c, err)
 		} else {
 			go p.p.p.destroyAcquiredConnection(ctx, p.c)
 		}

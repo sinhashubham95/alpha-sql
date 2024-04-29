@@ -16,16 +16,17 @@ type poolErrRow struct {
 }
 
 func (p *poolRow) Scan(ctx context.Context, values ...any) error {
+	var err error
 	panicked := true
 	defer func() {
 		if panicked && p.c != nil {
-			p.p.Release(ctx, p.c)
+			p.p.closeOrRelease(ctx, p.c, err)
 		}
 	}()
-	err := p.r.Scan(ctx, values...)
+	err = p.r.Scan(ctx, values...)
 	panicked = false
 	if p.c != nil {
-		p.p.Release(ctx, p.c)
+		p.p.closeOrRelease(ctx, p.c, err)
 	}
 	return err
 }

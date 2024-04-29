@@ -2,6 +2,7 @@ package pool
 
 import (
 	"context"
+	"errors"
 	alphasql "github.com/sinhashubham95/alpha-sql"
 	"github.com/sinhashubham95/go-utils/maths"
 	"time"
@@ -215,4 +216,12 @@ func (p *pool) release(ctx context.Context, c *Connection, ts int64) {
 		c.lastUsedNano = ts
 		p.idleConnections.push(c)
 	}
+}
+
+func (p *Pool) closeOrRelease(ctx context.Context, c *Connection, err error) {
+	if errors.Is(err, alphasql.ErrBadConnection) {
+		go p.p.destroyAcquiredConnection(ctx, c)
+		return
+	}
+	p.Release(ctx, c)
 }

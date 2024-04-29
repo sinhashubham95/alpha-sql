@@ -12,8 +12,9 @@ func (p *Pool) Ping(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer p.Release(ctx, c)
-	return c.Ping(ctx)
+	err = c.Ping(ctx)
+	p.closeOrRelease(ctx, c, err)
+	return err
 }
 
 // Query executes a query that returns rows, typically a SELECT.
@@ -25,7 +26,7 @@ func (p *Pool) Query(ctx context.Context, query string, args ...any) (alphasql.R
 	}
 	r, err := c.Query(ctx, query, args...)
 	if err != nil {
-		p.Release(ctx, c)
+		p.closeOrRelease(ctx, c, err)
 		return p.getPoolErrRows(err), err
 	}
 	return p.getPoolRows(c, r), nil
@@ -53,8 +54,9 @@ func (p *Pool) Exec(ctx context.Context, query string, args ...any) (alphasql.Re
 	if err != nil {
 		return nil, err
 	}
-	defer p.Release(ctx, c)
-	return c.Exec(ctx, query, args...)
+	r, err := c.Exec(ctx, query, args...)
+	p.closeOrRelease(ctx, c, err)
+	return r, err
 }
 
 // Prepare creates a prepared statement for later queries or executions.
@@ -67,8 +69,9 @@ func (p *Pool) Prepare(ctx context.Context, query string) (alphasql.Statement, e
 	if err != nil {
 		return nil, err
 	}
-	defer p.Release(ctx, c)
-	return c.Prepare(ctx, query)
+	s, err := c.Prepare(ctx, query)
+	p.closeOrRelease(ctx, c, err)
+	return s, err
 }
 
 // BeginTX starts a transaction.
@@ -88,7 +91,7 @@ func (p *Pool) BeginTX(ctx context.Context, options *alphasql.TXOptions) (alphas
 	}
 	t, err := c.BeginTX(ctx, options)
 	if err != nil {
-		p.Release(ctx, c)
+		p.closeOrRelease(ctx, c, err)
 		return nil, err
 	}
 	return p.getPoolTX(c, t), nil
