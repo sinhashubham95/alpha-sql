@@ -13,7 +13,7 @@ type Row interface {
 	// the query, Scan returns [ErrNoRows].
 	Scan(ctx context.Context, values ...any) error
 
-	Columns() []string
+	Columns() []Column
 
 	// Error provides a way for wrapping packages to check for
 	// query errors without calling [Row.Scan].
@@ -23,10 +23,9 @@ type Row interface {
 }
 
 type row struct {
-	s       driver.Stmt
-	r       Rows
-	columns []string
-	err     error
+	s   driver.Stmt
+	r   Rows
+	err error
 }
 
 func (r *row) Scan(ctx context.Context, values ...any) error {
@@ -47,7 +46,7 @@ func (r *row) Scan(ctx context.Context, values ...any) error {
 	return r.close(ctx)
 }
 
-func (r *row) Columns() []string {
+func (r *row) Columns() []Column {
 	return r.r.Columns()
 }
 

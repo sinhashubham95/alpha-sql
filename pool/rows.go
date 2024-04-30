@@ -40,7 +40,7 @@ func (p *poolRows) Scan(values ...any) error {
 	return p.rows.Scan(values...)
 }
 
-func (p *poolRows) Columns() []string {
+func (p *poolRows) Columns() []alphasql.Column {
 	return p.rows.Columns()
 }
 
@@ -64,6 +64,6 @@ func (p *poolErrRows) Scan(_ ...any) error {
 	return nil
 }
 
-func (p *poolErrRows) Columns() []string {
+func (p *poolErrRows) Columns() []alphasql.Column {
 	return nil
 }

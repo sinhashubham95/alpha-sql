@@ -103,7 +103,7 @@ type Rows interface {
 	// Similar to how until [Rows.Next] is not called, [Rows.Scan] won't work, [Rows.Columns]
 	// will also return stale or nil data until [Rows.Next] is called.
 	// Even though the result set has changed, until [Rows.Next] is called, the column list won't be updated.
-	Columns() []string
+	Columns() []Column
 }
 
 type rows struct {
@@ -114,7 +114,7 @@ type rows struct {
 	closed bool
 
 	current []driver.Value
-	columns []string
+	columns []Column
 }
 
 func (r *rows) Next(ctx context.Context) bool {
@@ -136,6 +136,7 @@ func (r *rows) NextResultSet(ctx context.Context) bool {
 		return false
 	}
 	r.current = nil
+	r.columns = nil
 	nextResultSet, ok := r.r.(driver.RowsNextResultSet)
 	if !ok {
 		_ = r.Close(ctx)
@@ -182,7 +183,7 @@ func (r *rows) Scan(vs ...any) error {
 	return nil
 }
 
-func (r *rows) Columns() []string {
+func (r *rows) Columns() []Column {
 	return r.columns
 }
 
@@ -206,7 +207,9 @@ func (r *rows) next() (doClose bool, ok bool) {
 		return false, false
 	}
 
-	r.columns = r.r.Columns()
+	if r.columns == nil {
+		r.columns = getColumnsFromDriverColumns(r.r)
+	}
 	if r.current == nil {
 		r.current = make([]driver.Value, len(r.columns))
 	}

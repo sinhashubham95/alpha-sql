@@ -107,7 +107,7 @@ func stringConversionError(err error) error {
 // An error is returned if the copy would result in loss of information.
 // dest should be a pointer type. If rows is passed in, the rows will
 // be used as the parent for any cursor values converted from a
-// driver.Rows to a *Rows.
+// driver.Rows to a Rows.
 func convertAssignRows(src, dest any) error {
 	// Common cases, without reflect.
 	switch s := src.(type) {

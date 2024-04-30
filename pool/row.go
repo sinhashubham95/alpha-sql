@@ -35,7 +35,7 @@ func (p *poolRow) Error() error {
 	return p.r.Error()
 }
 
-func (p *poolRow) Columns() []string {
+func (p *poolRow) Columns() []alphasql.Column {
 	return p.r.Columns()
 }
 
@@ -47,6 +47,6 @@ func (p *poolErrRow) Error() error {
 	return p.err
 }
 
-func (p *poolErrRow) Columns() []string {
+func (p *poolErrRow) Columns() []alphasql.Column {
 	return nil
 }
