@@ -63,8 +63,8 @@ type Rows interface {
 	// information would be lost. While Scan stringifies all numbers
 	// scanned from numeric database columns into *string, scans into
 	// numeric types are checked for overflow. For example, a float64 with
-	// value 300 or a string with value "300" can scan into a uint16, but
-	// not into a uint8, though float64(255) or "255" can scan into a
+	// value 300 or a string with value "300" can scan into an uint16, but
+	// not into an uint8, though float64(255) or "255" can scan into an
 	// uint8. One exception is that scans of some float64 numbers to
 	// strings may lose information when stringing. In general, scan
 	// floating point columns into *float64.
@@ -93,11 +93,17 @@ type Rows interface {
 	// Scan can also convert a cursor returned from a query, such as
 	// "select cursor(select * from my_table) from dual", into a
 	// [Rows] value that can itself be scanned from. The parent
-	// select query will close any cursor [*Rows] if the parent [*Rows] is closed.
+	// select query will close any cursor [Rows] if the parent [Rows] is closed.
 	//
 	// If any of the first arguments implementing [driver.Scanner] returns an error,
 	// that error will be wrapped in the returned error.
 	Scan(values ...any) error
+
+	// Columns are used to provide the current set of columns in the result set.
+	// Similar to how until [Rows.Next] is not called, [Rows.Scan] won't work, [Rows.Columns]
+	// will also return stale or nil data until [Rows.Next] is called.
+	// Even though the result set has changed, until [Rows.Next] is called, the column list won't be updated.
+	Columns() []string
 }
 
 type rows struct {
@@ -108,6 +114,7 @@ type rows struct {
 	closed bool
 
 	current []driver.Value
+	columns []string
 }
 
 func (r *rows) Next(ctx context.Context) bool {
@@ -175,6 +182,10 @@ func (r *rows) Scan(vs ...any) error {
 	return nil
 }
 
+func (r *rows) Columns() []string {
+	return r.columns
+}
+
 func (r *rows) close(err error) error {
 	if r.closed {
 		return nil
@@ -190,13 +201,14 @@ func (r *rows) close(err error) error {
 	return err
 }
 
-func (r *rows) next() (bool, bool) {
+func (r *rows) next() (doClose bool, ok bool) {
 	if r.closed {
 		return false, false
 	}
 
+	r.columns = r.r.Columns()
 	if r.current == nil {
-		r.current = make([]driver.Value, len(r.r.Columns()))
+		r.current = make([]driver.Value, len(r.columns))
 	}
 
 	r.err = r.r.Next(r.current)

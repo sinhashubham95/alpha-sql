@@ -6,14 +6,27 @@ import (
 )
 
 type Row interface {
+	// Scan copies the columns from the matched row into the values
+	// pointed at by dest. See the documentation on [Rows.Scan] for details.
+	// If more than one row matches the query,
+	// Scan uses the first row and discards the rest. If no row matches
+	// the query, Scan returns [ErrNoRows].
 	Scan(ctx context.Context, values ...any) error
+
+	Columns() []string
+
+	// Error provides a way for wrapping packages to check for
+	// query errors without calling [Row.Scan].
+	// Error returns the error, if any, that was encountered while running the query.
+	// If this error is not nil, this error will also be returned from [Row.Scan].
 	Error() error
 }
 
 type row struct {
-	s   driver.Stmt
-	r   Rows
-	err error
+	s       driver.Stmt
+	r       Rows
+	columns []string
+	err     error
 }
 
 func (r *row) Scan(ctx context.Context, values ...any) error {
@@ -32,6 +45,10 @@ func (r *row) Scan(ctx context.Context, values ...any) error {
 		return err
 	}
 	return r.close(ctx)
+}
+
+func (r *row) Columns() []string {
+	return r.r.Columns()
 }
 
 func (r *row) Error() error {

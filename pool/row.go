@@ -35,10 +35,18 @@ func (p *poolRow) Error() error {
 	return p.r.Error()
 }
 
+func (p *poolRow) Columns() []string {
+	return p.r.Columns()
+}
+
 func (p *poolErrRow) Scan(_ context.Context, _ ...any) error {
 	return nil
 }
 
 func (p *poolErrRow) Error() error {
 	return p.err
+}
+
+func (p *poolErrRow) Columns() []string {
+	return nil
 }

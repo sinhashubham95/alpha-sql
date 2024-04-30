@@ -40,6 +40,10 @@ func (p *poolRows) Scan(values ...any) error {
 	return p.rows.Scan(values...)
 }
 
+func (p *poolRows) Columns() []string {
+	return p.rows.Columns()
+}
+
 func (p *poolErrRows) Next(_ context.Context) bool {
 	return false
 }
@@ -60,10 +64,6 @@ func (p *poolErrRows) Scan(_ ...any) error {
 	return nil
 }
 
-func (p *poolErrRows) Values() ([]any, error) {
-	return nil, nil
-}
-
-func (p *poolErrRows) RawValues() [][]byte {
+func (p *poolErrRows) Columns() []string {
 	return nil
 }
