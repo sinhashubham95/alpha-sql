@@ -122,7 +122,7 @@ func (b *batch) Do(_ context.Context) (BatchResults, error) {
 	return nil, nil
 }
 
-func (b *batch) Close(ctx context.Context) error {
+func (b *batch) Close(_ context.Context) error {
 	if b.processing {
 		return ErrBatchProcessing
 	}
