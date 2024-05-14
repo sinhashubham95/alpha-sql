@@ -116,8 +116,9 @@ func (p *Pool) Close(ctx context.Context) {
 func newPool(ctx context.Context, p *Pool) *pool {
 	baseAcquireCtx, cancelBaseAcquireCtx := context.WithCancel(ctx)
 	return &pool{
-		acquireSem: semaphore.NewWeighted(int64(p.maxConnections)),
-		//idleResources:        genstack.NewGenStack[*Resource[T]](),
+		acquireSem:           semaphore.NewWeighted(int64(p.maxConnections)),
+		idleConnections:      newMVStack(),
+		allConnections:       make([]*Connection, 0),
 		maxSize:              p.maxConnections,
 		constructor:          p.constructor,
 		destructor:           p.destructor,
